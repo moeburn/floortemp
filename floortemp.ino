@@ -14,6 +14,7 @@
 Average<float> pm1Avg(30);
 Average<float> pm25Avg(30);
 Average<float> pm10Avg(30);
+float pmavgholder;
 
 
 #include <PMserial.h> // Arduino library for PM sensors with serial interface
@@ -111,7 +112,7 @@ void setup(void) {
   sensors.begin();
       Blynk.config(auth, IPAddress(192, 168, 50, 197), 8080);
     Blynk.connect();
-  terminal.println("=========F============");
+  terminal.println("=========Fv0.2============");
   terminal.print("Connected to ");
   terminal.println(ssid);
   terminal.print("IP address: ");
@@ -127,19 +128,18 @@ void setup(void) {
   printLocalTime();
   
   pms.init();
-    terminal.println("GREEN");
-    led.setColor(RGBLed::GREEN); 
-    terminal.flush();
-    delay(1000);  
-    // GREEN LED ON  
-    terminal.println("RED");
     led.setColor(RGBLed::RED);
     terminal.flush();
-    delay(1000);  
+    delay(500);  
+    led.setColor(RGBLed::GREEN); 
+    terminal.flush();
+    delay(500);  
+    // GREEN LED ON  
+
     // RED LED ON  
-    terminal.println("BLUE");
     led.setColor(RGBLed::BLUE);
-    
+    delay(500);  
+    led.brightness(0);
     terminal.flush();
 
 
@@ -160,8 +160,9 @@ if (menuValue == 1) {
         float temperatureC = sensors.getTempCByIndex(0);
         if (temperatureC > -126) {Blynk.virtualWrite(V1, temperatureC);}
         Blynk.virtualWrite(V2, pm1Avg.mean());
-        Blynk.virtualWrite(V3, pm25Avg.mean());
-        bridge1.virtualWrite(V51, pm25Avg.mean());
+        pmavgholder = pm25Avg.mean();
+        Blynk.virtualWrite(V3, pmavgholder);
+        bridge1.virtualWrite(V51, pmavgholder);
         Blynk.virtualWrite(V4, pm10Avg.mean());
         Blynk.virtualWrite(V5, pms.n0p3);
         Blynk.virtualWrite(V6, pms.n0p5);
