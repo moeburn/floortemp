@@ -14,8 +14,11 @@
 Average<float> pm1Avg(30);
 Average<float> pm25Avg(30);
 Average<float> pm10Avg(30);
+Average<float> wifiAvg(30);
+Average<float> sunAvg(30);
+bool rapidfire = false;
 float pmavgholder;
-
+float temperatureC;
 
 #include <PMserial.h> // Arduino library for PM sensors with serial interface
 #if defined(USE_HWSERIAL2)
@@ -57,6 +60,7 @@ char remoteAuth[] = "X_pnRUFOab29d3aNrScsKq1dryQYdTw7";
 
 unsigned long millisBlynk = 0;
 unsigned long millisAvg = 0;
+unsigned long millisSun = 0;
 
 AsyncWebServer server(80);
 
@@ -91,7 +95,7 @@ BLYNK_WRITE(V17)
 WidgetBridge bridge1(V50);
 
 void setup(void) {
-  configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
+  
      pinMode(RGBPIN1,HIGH);  // Blue led Pin Connected To D0 Pin   
    pinMode(RGBPIN2,HIGH);  // Green Led Pin Connected To D1 Pin   
    pinMode(RGBPIN3,HIGH);  // Red Led Connected To D2 Pin    
@@ -108,8 +112,12 @@ void setup(void) {
     Serial.print(".");
   }
   led.crossFade(RGBLed::BLUE, RGBLed::GREEN, 20, 2000);  // Fade from RED to GREEN in 5 steps during 100ms 
+    delay(500);
+  configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
+  delay(500);
     // Start the DS18B20 sensor
   sensors.begin();
+  sensors.requestTemperatures(); 
       Blynk.config(auth, IPAddress(192, 168, 50, 197), 8080);
     Blynk.connect();
   terminal.println("=========Fv0.2============");
@@ -138,8 +146,26 @@ void setup(void) {
 
     // RED LED ON  
     led.setColor(RGBLed::BLUE);
-    delay(500);  
-    led.brightness(0);
+    delay(100);  
+    led.brightness(RGBLed::BLUE, 90);
+    delay(100);  
+    led.brightness(RGBLed::BLUE, 80);
+    delay(100);  
+    led.brightness(RGBLed::BLUE, 70);
+    delay(100);  
+    led.brightness(RGBLed::BLUE, 60);
+    delay(100);  
+    led.brightness(RGBLed::BLUE, 50);
+    delay(100);  
+    led.brightness(RGBLed::BLUE, 40);
+    delay(100);  
+    led.brightness(RGBLed::BLUE, 30);
+    delay(100);  
+    led.brightness(RGBLed::BLUE, 20);
+    delay(100);  
+    led.brightness(RGBLed::BLUE, 10);
+    delay(100);  
+    led.brightness(RGBLed::BLUE, 0);
     terminal.flush();
 
 
@@ -157,8 +183,11 @@ if (menuValue == 1) {
         readPMS();
         millisBlynk = millis();
         sensors.requestTemperatures(); 
-        float temperatureC = sensors.getTempCByIndex(0);
-        if (temperatureC > -126) {Blynk.virtualWrite(V1, temperatureC);}
+        sensors.requestTemperatures(); 
+        temperatureC = sensors.getTempCByIndex(0);
+        if ((temperatureC > -126) && (temperatureC != 85)) {Blynk.virtualWrite(V1, temperatureC);
+        bridge1.virtualWrite(V54, temperatureC);
+        }
         Blynk.virtualWrite(V2, pm1Avg.mean());
         pmavgholder = pm25Avg.mean();
         Blynk.virtualWrite(V3, pmavgholder);
@@ -170,12 +199,20 @@ if (menuValue == 1) {
         Blynk.virtualWrite(V8, pms.n2p5);
         Blynk.virtualWrite(V9, pms.n5p0);
         Blynk.virtualWrite(V10, pms.n10p0);
+        Blynk.virtualWrite(V11, wifiAvg.mean());
+        if (!rapidfire) {Blynk.virtualWrite(V12, sunAvg.mean());}
     }
     
     if  (millis() - millisAvg >= 1000)  //if it's been 1 second
     {
+        wifiAvg.push(WiFi.RSSI());
+        sunAvg.push(analogRead(A0));
         readPMS();
         millisAvg = millis();
+    }
+        if (rapidfire) 
+    {
+        Blynk.virtualWrite(V12, analogRead(A0));
     }
     
 }
@@ -323,6 +360,9 @@ BLYNK_WRITE(V0)
     terminal.println("wifi");
     terminal.println("particles");
     terminal.println("blink");
+    terminal.println("rapidon");
+    terminal.println("rapidoff");
+    terminal.println("temp");
      terminal.println("==End of list.==");
     }
         if (String("wifi") == param.asStr()) 
@@ -333,6 +373,7 @@ BLYNK_WRITE(V0)
         terminal.println(WiFi.localIP());
         terminal.print("Signal strength: ");
         terminal.println(WiFi.RSSI());
+        printLocalTime();
     }
     if (String("particles") == param.asStr()) {
       readPMSverbose();
@@ -342,6 +383,21 @@ BLYNK_WRITE(V0)
       terminal.println("Blinking...");
   led.crossFade(RGBLed::BLUE, RGBLed::GREEN, 20, 2000);
     }
+    if (String("rapidon") == param.asStr()) {
+      rapidfire = true;
+    }
+        if (String("rapidoff") == param.asStr()) {
+      rapidfire = false;
+    }
+    if (String("temp") == param.asStr()) {
+    sensors.requestTemperatures(); 
+    sensors.requestTemperatures(); 
+        temperatureC = sensors.getTempCByIndex(0);
+        terminal.print("Temp: ");
+        terminal.println(temperatureC);
+    }
+
+
 
 
     terminal.flush();
@@ -351,3 +407,4 @@ BLYNK_WRITE(V0)
 BLYNK_CONNECTED() {
   bridge1.setAuthToken (remoteAuth);
 }
+
