@@ -10,6 +10,18 @@
 #include <RGBLed.h>
 #include "time.h"
 #include <Average.h>
+#include <ESP8266HTTPClient.h>
+#include <Arduino_JSON.h>
+
+String openWeatherMapApiKey = "25a3e27db184bc57cf33bccc752291c9";
+// Example:
+//String openWeatherMapApiKey = "bd939aa3d23ff33d3c8f5dd1dd435";
+
+// Replace with your country code and city
+String city = "Stratford";
+String countryCode = "CA";
+
+String jsonBuffer;
 
 Average<float> pm1Avg(30);
 Average<float> pm25Avg(30);
@@ -71,7 +83,36 @@ int zebraR, zebraG, zebraB, sliderValue;
 int menuValue = 2;
 float  pmR, pmG, pmB;
 float old1p0, old2p5, old10, new1p0, new2p5, new10;
+
+double inetTemp, inetWindspeed, inetWinddeg, inetWindgust;
 bool rgbON = true;
+
+String httpGETRequest(const char* serverName) {
+  WiFiClient client;
+  HTTPClient http;
+    
+  // Your Domain name with URL path or IP address with path
+  http.begin(client, serverName);
+  
+  // Send HTTP POST request
+  int httpResponseCode = http.GET();
+  
+  String payload = "{}"; 
+  
+  if (httpResponseCode>0) {
+    Serial.print("HTTP Response code: ");
+    Serial.println(httpResponseCode);
+    payload = http.getString();
+  }
+  else {
+    Serial.print("Error code: ");
+    Serial.println(httpResponseCode);
+  }
+  // Free resources
+  http.end();
+
+  return payload;
+}
 
 
 
@@ -182,11 +223,13 @@ if (menuValue == 1) {
     {
         readPMS();
         millisBlynk = millis();
+        doWeather();
         sensors.requestTemperatures(); 
         sensors.requestTemperatures(); 
         temperatureC = sensors.getTempCByIndex(0);
         if ((temperatureC > -126) && (temperatureC != 85)) {Blynk.virtualWrite(V1, temperatureC);
         bridge1.virtualWrite(V54, temperatureC);
+        
         }
         Blynk.virtualWrite(V2, pm1Avg.mean());
         pmavgholder = pm25Avg.mean();
@@ -200,6 +243,14 @@ if (menuValue == 1) {
         Blynk.virtualWrite(V9, pms.n5p0);
         Blynk.virtualWrite(V10, pms.n10p0);
         Blynk.virtualWrite(V11, wifiAvg.mean());
+        Blynk.virtualWrite(V15, inetTemp);
+        Blynk.virtualWrite(V16, inetWindspeed);
+        Blynk.virtualWrite(V17, inetWindgust);
+        Blynk.virtualWrite(V18, inetWinddeg);
+        bridge1.virtualWrite(V55, inetTemp);
+        bridge1.virtualWrite(V56, inetWindspeed);
+        bridge1.virtualWrite(V57, inetWindgust);
+        bridge1.virtualWrite(V58, inetWinddeg);
         if (!rapidfire) {Blynk.virtualWrite(V12, sunAvg.mean());}
     }
     
@@ -397,7 +448,35 @@ BLYNK_WRITE(V0)
         terminal.println(temperatureC);
     }
 
-
+if (String("weather") == param.asStr()) {
+          String serverPath = "http://api.openweathermap.org/data/2.5/weather?q=" + city + "," + countryCode + "&APPID=" + openWeatherMapApiKey;
+      
+      jsonBuffer = httpGETRequest(serverPath.c_str());
+      terminal.println(jsonBuffer);
+      JSONVar myObject = JSON.parse(jsonBuffer);
+  
+      // JSON.typeof(jsonVar) can be used to get the type of the var
+      if (JSON.typeof(myObject) == "undefined") {
+        terminal.println("Parsing input failed!");
+        return;
+      }
+    
+      terminal.print("JSON object = ");
+      terminal.println(myObject);
+      terminal.print("Temperature: ");
+      terminal.println(double((myObject["main"]["temp"])) - 273.15);
+      terminal.print("Pressure: ");
+      terminal.println(myObject["main"]["pressure"]);
+      terminal.print("Humidity: ");
+      terminal.println(myObject["main"]["humidity"]);
+      terminal.print("Wind Speed kph: ");
+      terminal.println(3.6 * double((myObject["wind"]["speed"])));
+            terminal.print("Wind gust kph: ");
+      terminal.println(3.6 * double((myObject["wind"]["gust"])));
+            terminal.print("Wind direction deg: ");
+      terminal.println(double((myObject["wind"]["deg"])));
+    terminal.flush();
+  }
 
 
     terminal.flush();
@@ -406,5 +485,17 @@ BLYNK_WRITE(V0)
 
 BLYNK_CONNECTED() {
   bridge1.setAuthToken (remoteAuth);
+}
+
+void doWeather(){
+           String serverPath = "http://api.openweathermap.org/data/2.5/weather?q=" + city + "," + countryCode + "&APPID=" + openWeatherMapApiKey;
+      
+      jsonBuffer = httpGETRequest(serverPath.c_str());
+      terminal.println(jsonBuffer);
+      JSONVar myObject = JSON.parse(jsonBuffer);
+      inetTemp = (double((myObject["main"]["temp"])) - 273.15);
+      inetWindspeed = (3.6 * double((myObject["wind"]["speed"])));
+      inetWinddeg = (double((myObject["wind"]["deg"])));
+      inetWindgust = (3.6 * double((myObject["wind"]["gust"])));
 }
 
