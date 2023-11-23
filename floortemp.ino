@@ -7,11 +7,17 @@
 #include <BlynkSimpleEsp8266.h>
 #include <OneWire.h>
 #include <DallasTemperature.h>
-#include <RGBLed.h>
+//#include <RGBLed.h>
 #include "time.h"
 #include <Average.h>
 #include <ESP8266HTTPClient.h>
 #include <Arduino_JSON.h>
+#include "Plantower_PMS7003.h"
+#include <SoftwareSerial.h>
+
+char output[256];
+Plantower_PMS7003 pms7003 = Plantower_PMS7003();
+SoftwareSerial SoftSerial1(14, 12);
 
 String openWeatherMapApiKey = "25a3e27db184bc57cf33bccc752291c9";
 // Example:
@@ -26,23 +32,16 @@ String jsonBuffer;
 Average<float> pm1Avg(30);
 Average<float> pm25Avg(30);
 Average<float> pm10Avg(30);
+Average<float> pm1aAvg(30);
+Average<float> pm25aAvg(30);
+Average<float> pm10aAvg(30);
 Average<float> wifiAvg(30);
 Average<float> sunAvg(30);
 bool rapidfire = false;
 float pmavgholder;
 float temperatureC;
 
-#include <PMserial.h> // Arduino library for PM sensors with serial interface
-#if defined(USE_HWSERIAL2)
-#define MSG "PMSx003 on HardwareSerial2"
-SerialPM pms(PMSx003, Serial2); // PMSx003, UART
-#elif defined(USE_HWSERIAL1)
-#define MSG "PMSx003 on HardwareSerial1"
-SerialPM pms(PMSx003, Serial1); // PMSx003, UART
-#else
-#define MSG "PMSx003 on HardwareSerial"
-SerialPM pms(PMSx003, Serial); // PMSx003, UART
-#endif
+
 
 #define RGBPIN2 15
 #define RGBPIN1 0
@@ -53,12 +52,12 @@ const long  gmtOffset_sec = -14400;   //Replace with your GMT offset (seconds)
 const int   daylightOffset_sec = 0;  //Replace with your daylight offset (seconds)
 
 
-RGBLed led(RGBPIN1, RGBPIN2, RGBPIN3, RGBLed::COMMON_CATHODE);
+//RGBLed led(RGBPIN1, RGBPIN2, RGBPIN3, RGBLed::COMMON_CATHODE);
 
 // GPIO where the DS18B20 is connected to
 const int oneWireBus = 4;     
 
-// Setup a oneWire instance to communicate with any OneWire devices
+//a oneWire instance to communicate with any OneWire devices
 OneWire oneWire(oneWireBus);
 
 // Pass our oneWire reference to Dallas Temperature sensor 
@@ -84,6 +83,8 @@ int zebraR, zebraG, zebraB, sliderValue;
 int menuValue = 2;
 float  pmR, pmG, pmB;
 float old1p0, old2p5, old10, new1p0, new2p5, new10;
+float old1p0a, old2p5a, old10a, new1p0a, new2p5a, new10a;
+unsigned int up3, up5, up10, up25, up50, up100;
 
 double inetTemp, inetWindspeed, inetWinddeg, inetWindgust;
 bool rgbON = true;
@@ -129,10 +130,6 @@ BLYNK_WRITE(V16)
      zebraB = param[2].asInt();
 }
 
-BLYNK_WRITE(V17)
-{
-      led.brightness(param.asInt()); // assigning incoming value from pin V1 to a variable   
-}
 
 WidgetBridge bridge1(V50);
 WidgetBridge bridge2(V60);
@@ -144,6 +141,8 @@ void setup(void) {
    pinMode(RGBPIN3,HIGH);  // Red Led Connected To D2 Pin    
 
   Serial.begin(9600);
+  SoftSerial1.begin(9600);
+  pms7003.init(&SoftSerial1);
   WiFi.mode(WIFI_STA);
     WiFi.setPhyMode(WIFI_PHY_MODE_11B);
   WiFi.begin(ssid, password);
@@ -151,19 +150,17 @@ void setup(void) {
 
   // Wait for connection
   while (WiFi.status() != WL_CONNECTED) {
-    led.crossFade(RGBLed::RED, RGBLed::BLUE, 5, 500);  // Fade from RED to GREEN in 5 steps during 100ms 
+   // led.crossFade(RGBLed::RED, RGBLed::BLUE, 5, 500);  // Fade from RED to GREEN in 5 steps during 100ms 
     Serial.print(".");
   }
-  led.crossFade(RGBLed::BLUE, RGBLed::GREEN, 20, 2000);  // Fade from RED to GREEN in 5 steps during 100ms 
     delay(500);
   configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
-  delay(500);
     // Start the DS18B20 sensor
   sensors.begin();
   sensors.requestTemperatures(); 
       Blynk.config(auth, IPAddress(192, 168, 50, 197), 8080);
     Blynk.connect();
-  terminal.println("=========Fv0.3============");
+  terminal.println("=========Fv0.4============");
   terminal.print("Connected to ");
   terminal.println(ssid);
   terminal.print("IP address: ");
@@ -178,37 +175,7 @@ void setup(void) {
   terminal.println("HTTP server started");
   printLocalTime();
   
-  pms.init();
-    led.setColor(RGBLed::RED);
-    terminal.flush();
-    delay(500);  
-    led.setColor(RGBLed::GREEN); 
-    terminal.flush();
-    delay(500);  
-    // GREEN LED ON  
-
-    // RED LED ON  
-    led.setColor(RGBLed::BLUE);
-    delay(100);  
-    led.brightness(RGBLed::BLUE, 90);
-    delay(100);  
-    led.brightness(RGBLed::BLUE, 80);
-    delay(100);  
-    led.brightness(RGBLed::BLUE, 70);
-    delay(100);  
-    led.brightness(RGBLed::BLUE, 60);
-    delay(100);  
-    led.brightness(RGBLed::BLUE, 50);
-    delay(100);  
-    led.brightness(RGBLed::BLUE, 40);
-    delay(100);  
-    led.brightness(RGBLed::BLUE, 30);
-    delay(100);  
-    led.brightness(RGBLed::BLUE, 20);
-    delay(100);  
-    led.brightness(RGBLed::BLUE, 10);
-    delay(100);  
-    led.brightness(RGBLed::BLUE, 0);
+  //  led.brightness(RGBLed::BLUE, 0);
     terminal.flush();
 
 
@@ -217,13 +184,12 @@ void setup(void) {
 void loop(void) {
  
 Blynk.run();
-if (menuValue == 1) {
-  led.setColor(zebraR, zebraG, zebraB);
-}
+    pms7003.updateFrame();
+    readPMS();
+
  
     if  (millis() - millisBlynk >= 30000)  //if it's been 30 seconds 
     {
-        readPMS();
         millisBlynk = millis();
         doWeather();
         sensors.requestTemperatures(); 
@@ -239,12 +205,15 @@ if (menuValue == 1) {
         bridge1.virtualWrite(V51, pmavgholder);
         bridge2.virtualWrite(V51, pmavgholder);
         Blynk.virtualWrite(V4, pm10Avg.mean());
-        Blynk.virtualWrite(V5, pms.n0p3);
-        Blynk.virtualWrite(V6, pms.n0p5);
-        Blynk.virtualWrite(V7, pms.n1p0);
-        Blynk.virtualWrite(V8, pms.n2p5);
-        Blynk.virtualWrite(V9, pms.n5p0);
-        Blynk.virtualWrite(V10, pms.n10p0);
+        Blynk.virtualWrite(V5, up3);
+        Blynk.virtualWrite(V6, up5);
+        Blynk.virtualWrite(V7, up10);
+        Blynk.virtualWrite(V8, up25);
+        Blynk.virtualWrite(V9, up50);
+        Blynk.virtualWrite(V10, up100);
+        Blynk.virtualWrite(V20, pm1aAvg.mean());
+        Blynk.virtualWrite(V21, pm25aAvg.mean());
+        Blynk.virtualWrite(V22, pm10aAvg.mean());
         Blynk.virtualWrite(V11, wifiAvg.mean());
         Blynk.virtualWrite(V15, inetTemp);
         Blynk.virtualWrite(V16, inetWindspeed);
@@ -265,7 +234,6 @@ if (menuValue == 1) {
     {
         wifiAvg.push(WiFi.RSSI());
         sunAvg.push(analogRead(A0));
-        readPMS();
         millisAvg = millis();
     }
         if (rapidfire) 
@@ -276,101 +244,32 @@ if (menuValue == 1) {
 }
 
 void readPMSverbose(void){
-    pms.read();
-  if (pms)
-  { // successfull read
-#if defined(ESP8266) || defined(ESP32)
-    // print formatted results
-    terminal.printf("PM1.0 %2d, PM2.5 %2d, PM10 %2d [ug/m3]\n",
-                  pms.pm01, pms.pm25, pms.pm10);
+        sprintf(output, "\nSensor Version: %d    Error Code: %d\n",
+                      pms7003.getHWVersion(),
+                      pms7003.getErrorCode());
+        terminal.print(output);
 
-    if (pms.has_number_concentration())
-      terminal.printf("N0.3 %4d, N0.5 %3d, N1.0 %2d, N2.5 %2d, N5.0 %2d, N10 %2d [#/100cc]\n",
-                    pms.n0p3, pms.n0p5, pms.n1p0, pms.n2p5, pms.n5p0, pms.n10p0);
+        sprintf(output, "    PM1.0 (ug/m3): %2d     [atmos: %d]\n",
+                      pms7003.getPM_1_0(),
+                      pms7003.getPM_1_0_atmos());              
+        terminal.print(output);
+        sprintf(output, "    PM2.5 (ug/m3): %2d     [atmos: %d]\n",
+                      pms7003.getPM_2_5(),
+                      pms7003.getPM_2_5_atmos());
+        terminal.print(output);
+        sprintf(output, "    PM10  (ug/m3): %2d     [atmos: %d]\n",
+                      pms7003.getPM_10_0(),
+                      pms7003.getPM_10_0_atmos());              
+        terminal.print(output);
 
-    if (pms.has_temperature_humidity() || pms.has_formaldehyde())
-      terminal.printf("%5.1f °C, %5.1f %%rh, %5.2f mg/m3 HCHO\n",
-                    pms.temp, pms.rhum, pms.hcho);
-#else
-    // print the results
-    terminal.print(F("PM1.0 "));
-    terminal.print(pms.pm01);
-    terminal.print(F(", "));
-    terminal.print(F("PM2.5 "));
-    terminal.print(pms.pm25);
-    terminal.print(F(", "));
-    terminal.print(F("PM10 "));
-    terminal.print(pms.pm10);
-    terminal.println(F(" [ug/m3]"));
-
-    if (pms.has_number_concentration())
-    {
-      terminal.print(F("N0.3 "));
-      terminal.print(pms.n0p3);
-      terminal.print(F(", "));
-      terminal.print(F("N0.5 "));
-      terminal.print(pms.n0p5);
-      terminal.print(F(", "));
-      terminal.print(F("N1.0 "));
-      terminal.print(pms.n1p0);
-      terminal.print(F(", "));
-      terminal.print(F("N2.5 "));
-      terminal.print(pms.n2p5);
-      terminal.print(F(", "));
-      terminal.print(F("N5.0 "));
-      terminal.print(pms.n5p0);
-      terminal.print(F(", "));
-      terminal.print(F("N10 "));
-      terminal.print(pms.n10p0);
-      terminal.println(F(" [#/100cc]"));
-    }
-
-    if (pms.has_temperature_humidity() || pms.has_formaldehyde())
-    {
-      terminal.print(pms.temp, 1);
-      terminal.print(F(" °C"));
-      terminal.print(F(", "));
-      terminal.print(pms.rhum, 1);
-      terminal.print(F(" %rh"));
-      terminal.print(F(", "));
-      terminal.print(pms.hcho, 2);
-      terminal.println(F(" mg/m3 HCHO"));
-    }
-#endif
-  }
-  else
-  { // something went wrong
-    switch (pms.status)
-    {
-    case pms.OK: // should never come here
-      break;     // included to compile without warnings
-    case pms.ERROR_TIMEOUT:
-      terminal.println(F(PMS_ERROR_TIMEOUT));
-      break;
-    case pms.ERROR_MSG_UNKNOWN:
-      terminal.println(F(PMS_ERROR_MSG_UNKNOWN));
-      break;
-    case pms.ERROR_MSG_HEADER:
-      terminal.println(F(PMS_ERROR_MSG_HEADER));
-      break;
-    case pms.ERROR_MSG_BODY:
-      terminal.println(F(PMS_ERROR_MSG_BODY));
-      break;
-    case pms.ERROR_MSG_START:
-      terminal.println(F(PMS_ERROR_MSG_START));
-      break;
-    case pms.ERROR_MSG_LENGTH:
-      terminal.println(F(PMS_ERROR_MSG_LENGTH));
-      break;
-    case pms.ERROR_MSG_CKSUM:
-      terminal.println(F(PMS_ERROR_MSG_CKSUM));
-      break;
-    case pms.ERROR_PMS_TYPE:
-      terminal.println(F(PMS_ERROR_PMS_TYPE));
-      break;
-    }
-  }
-terminal.flush();
+        sprintf(output, "\n    RAW: %2d[>0.3] %2d[>0.5] %2d[>1.0] %2d[>2.5] %2d[>5.0] %2d[>10]\n",
+                      pms7003.getRawGreaterThan_0_3(),
+                      pms7003.getRawGreaterThan_0_5(),
+                      pms7003.getRawGreaterThan_1_0(),
+                      pms7003.getRawGreaterThan_2_5(),
+                      pms7003.getRawGreaterThan_5_0(),
+                      pms7003.getRawGreaterThan_10_0());
+        terminal.print(output);
 }
 
 void printLocalTime()
@@ -386,11 +285,10 @@ void printLocalTime()
 }
 
 void readPMS(void){
-    pms.read();
-
-        new1p0 = pms.pm01;
-        new2p5 = pms.pm25;
-        new10 = pms.pm10;
+ if (pms7003.hasNewData()) {
+        new1p0 = pms7003.getPM_1_0();
+        new2p5 = pms7003.getPM_2_5();
+        new10 = pms7003.getPM_10_0();
                 if (firstvalue == 0)  //do not do this on the first run
         {
             if (new1p0 > 200) {new1p0 = old1p0;} //check for data spikes in particle counter, ignore data that is >200
@@ -406,8 +304,33 @@ void readPMS(void){
         old1p0 = new1p0; //reset data spike check variable
         old2p5 = new2p5;
         old10 = new10;
-        firstvalue = 0;
 
+        new1p0a = pms7003.getPM_1_0_atmos(); 
+        new2p5a = pms7003.getPM_2_5_atmos();
+        new10a = pms7003.getPM_10_0_atmos();
+                if (firstvalue == 0)  //do not do this on the first run
+        {
+            if (new1p0a > 200) {new1p0a = old1p0a;} //check for data spikes in particle counter, ignore data that is >200
+            if (new2p5a > 200) {new2p5a = old2p5a;} //data spikes ruin pretty graph
+            if (new10a > 200) {new10a = old10a;}
+            if (new1p0a - old1p0a > 50) {new1p0a = old1p0a;} //also ignore data that is >50 off from last data
+            if (new2p5a - old2p5a > 50) {new2p5a = old2p5a;}
+            if (new10a - old10a > 50) {new10a = old10a;}
+        }
+        pm1aAvg.push(new1p0a);
+        pm25aAvg.push(new2p5a);
+        pm10aAvg.push(new10a);
+        old1p0a = new1p0a; //reset data spike check variable
+        old2p5a = new2p5a;
+        old10a = new10a;        
+       up3 = pms7003.getRawGreaterThan_0_3();
+       up5 = pms7003.getRawGreaterThan_0_5();
+       up10 = pms7003.getRawGreaterThan_1_0();
+       up25 = pms7003.getRawGreaterThan_2_5();
+       up50 = pms7003.getRawGreaterThan_5_0();
+       up100 = pms7003.getRawGreaterThan_10_0();
+    firstvalue = 0;
+  }
 
 }
 
@@ -418,7 +341,6 @@ BLYNK_WRITE(V0)
     terminal.println("==List of available commands:==");
     terminal.println("wifi");
     terminal.println("particles");
-    terminal.println("blink");
     terminal.println("rapidon");
     terminal.println("rapidoff");
     terminal.println("temp");
@@ -440,10 +362,7 @@ BLYNK_WRITE(V0)
       readPMSverbose();
     }
 
-    if (String("blink") == param.asStr()) {
-      terminal.println("Blinking...");
-  led.crossFade(RGBLed::BLUE, RGBLed::GREEN, 20, 2000);
-    }
+
     if (String("rapidon") == param.asStr()) {
       rapidfire = true;
     }
