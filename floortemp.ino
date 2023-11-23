@@ -69,6 +69,7 @@ const char* password = "springchicken";
 
 char auth[] = "yRR6LtN228UywT1U4I6yDOzuZZzWcXYs"; //BLYNK
 char remoteAuth[] = "X_pnRUFOab29d3aNrScsKq1dryQYdTw7";
+char remoteAuth2[] = "8_-CN2rm4ki9P3i_NkPhxIbCiKd5RXhK";
 
 unsigned long millisBlynk = 0;
 unsigned long millisAvg = 0;
@@ -134,6 +135,7 @@ BLYNK_WRITE(V17)
 }
 
 WidgetBridge bridge1(V50);
+WidgetBridge bridge2(V60);
 
 void setup(void) {
   
@@ -161,7 +163,7 @@ void setup(void) {
   sensors.requestTemperatures(); 
       Blynk.config(auth, IPAddress(192, 168, 50, 197), 8080);
     Blynk.connect();
-  terminal.println("=========Fv0.2============");
+  terminal.println("=========Fv0.3============");
   terminal.print("Connected to ");
   terminal.println(ssid);
   terminal.print("IP address: ");
@@ -229,12 +231,13 @@ if (menuValue == 1) {
         temperatureC = sensors.getTempCByIndex(0);
         if ((temperatureC > -126) && (temperatureC != 85)) {Blynk.virtualWrite(V1, temperatureC);
         bridge1.virtualWrite(V54, temperatureC);
-        
+        bridge2.virtualWrite(V54, temperatureC);
         }
         Blynk.virtualWrite(V2, pm1Avg.mean());
         pmavgholder = pm25Avg.mean();
         Blynk.virtualWrite(V3, pmavgholder);
         bridge1.virtualWrite(V51, pmavgholder);
+        bridge2.virtualWrite(V51, pmavgholder);
         Blynk.virtualWrite(V4, pm10Avg.mean());
         Blynk.virtualWrite(V5, pms.n0p3);
         Blynk.virtualWrite(V6, pms.n0p5);
@@ -251,6 +254,10 @@ if (menuValue == 1) {
         bridge1.virtualWrite(V56, inetWindspeed);
         bridge1.virtualWrite(V57, inetWindgust);
         bridge1.virtualWrite(V58, inetWinddeg);
+        bridge2.virtualWrite(V55, inetTemp);
+        bridge2.virtualWrite(V56, inetWindspeed);
+        bridge2.virtualWrite(V57, inetWindgust);
+        bridge2.virtualWrite(V58, inetWinddeg);
         if (!rapidfire) {Blynk.virtualWrite(V12, sunAvg.mean());}
     }
     
@@ -375,6 +382,7 @@ void printLocalTime()
   terminal.print("-");
   terminal.print(asctime(timeinfo));
   terminal.print(" - ");
+  terminal.flush();
 }
 
 void readPMS(void){
@@ -414,6 +422,8 @@ BLYNK_WRITE(V0)
     terminal.println("rapidon");
     terminal.println("rapidoff");
     terminal.println("temp");
+    terminal.println("weather");
+    terminal.println("winddir");
      terminal.println("==End of list.==");
     }
         if (String("wifi") == param.asStr()) 
@@ -477,7 +487,19 @@ if (String("weather") == param.asStr()) {
       terminal.println(double((myObject["wind"]["deg"])));
     terminal.flush();
   }
-
+if (String("winddir") == param.asStr()) {
+            String serverPath = "http://api.openweathermap.org/data/2.5/weather?q=" + city + "," + countryCode + "&APPID=" + openWeatherMapApiKey;
+      
+      jsonBuffer = httpGETRequest(serverPath.c_str());
+      terminal.println(jsonBuffer);
+      JSONVar myObject = JSON.parse(jsonBuffer);
+            terminal.print("Wind direction deg: ");
+      terminal.println(double((myObject["wind"]["deg"])));
+      terminal.print("Wind direction: ");
+      int tempwinddir = (double((myObject["wind"]["deg"])));
+      terminal.println(windDirection(tempwinddir));
+     terminal.flush();
+}
 
     terminal.flush();
 
@@ -485,13 +507,13 @@ if (String("weather") == param.asStr()) {
 
 BLYNK_CONNECTED() {
   bridge1.setAuthToken (remoteAuth);
+  bridge2.setAuthToken (remoteAuth2);
 }
 
 void doWeather(){
            String serverPath = "http://api.openweathermap.org/data/2.5/weather?q=" + city + "," + countryCode + "&APPID=" + openWeatherMapApiKey;
       
       jsonBuffer = httpGETRequest(serverPath.c_str());
-      terminal.println(jsonBuffer);
       JSONVar myObject = JSON.parse(jsonBuffer);
       inetTemp = (double((myObject["main"]["temp"])) - 273.15);
       inetWindspeed = (3.6 * double((myObject["wind"]["speed"])));
@@ -499,3 +521,62 @@ void doWeather(){
       inetWindgust = (3.6 * double((myObject["wind"]["gust"])));
 }
 
+String windDirection(int temp_wind_deg)   //Source http://snowfence.umn.edu/Components/winddirectionanddegreeswithouttable3.htm
+{
+  switch(temp_wind_deg){
+    case 0 ... 11:
+      return "N";
+      break;
+    case 12 ... 33:
+      return "NNE";
+      break;
+    case 34 ... 56:
+      return "NE";
+      break;
+    case 57 ... 78:
+      return "ENE";
+      break;
+    case 79 ... 101:
+      return "E";
+      break;
+    case 102 ... 123:
+      return "ESE";
+      break;
+    case 124 ... 146:
+      return "SE";
+      break;
+    case 147 ... 168:
+      return "SSE";
+      break;
+    case 169 ... 191:
+      return "S";
+      break;
+    case 192 ... 213:
+      return "SSW";
+      break;
+    case 214 ... 236:
+      return "SW";
+      break;
+    case 237 ... 258:
+      return "WSW";
+      break;
+    case 259 ... 281:
+      return "W";
+      break;
+    case 282 ... 303:
+      return "WNW";
+      break;
+    case 304 ... 326:
+      return "NW";
+      break;
+    case 327 ... 348:
+      return "NNW";
+      break;
+    case 349 ... 360:
+      return "N";
+      break;
+    default:
+      return "error";
+      break;
+  }
+}
