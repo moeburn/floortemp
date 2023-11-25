@@ -29,12 +29,9 @@ String countryCode = "CA";
 
 String jsonBuffer;
 
-Average<float> pm1Avg(30);
-Average<float> pm25Avg(30);
-Average<float> pm10Avg(30);
-Average<float> pm1aAvg(30);
-Average<float> pm25aAvg(30);
-Average<float> pm10aAvg(30);
+Average<float> pm1Avg(6);
+Average<float> pm25Avg(6);
+Average<float> pm10Avg(6);
 Average<float> wifiAvg(30);
 Average<float> sunAvg(30);
 bool rapidfire = false;
@@ -48,7 +45,7 @@ float temperatureC;
 #define RGBPIN3 12
 
 const char* ntpServer = "pool.ntp.org";
-const long  gmtOffset_sec = -14400;   //Replace with your GMT offset (seconds)
+const long  gmtOffset_sec = -18000;   //Replace with your GMT offset (seconds)
 const int   daylightOffset_sec = 0;  //Replace with your daylight offset (seconds)
 
 
@@ -211,9 +208,7 @@ Blynk.run();
         Blynk.virtualWrite(V8, up25);
         Blynk.virtualWrite(V9, up50);
         Blynk.virtualWrite(V10, up100);
-        Blynk.virtualWrite(V20, pm1aAvg.mean());
-        Blynk.virtualWrite(V21, pm25aAvg.mean());
-        Blynk.virtualWrite(V22, pm10aAvg.mean());
+
         Blynk.virtualWrite(V11, wifiAvg.mean());
         Blynk.virtualWrite(V15, inetTemp);
         Blynk.virtualWrite(V16, inetWindspeed);
@@ -286,50 +281,18 @@ void printLocalTime()
 
 void readPMS(void){
  if (pms7003.hasNewData()) {
-        new1p0 = pms7003.getPM_1_0();
-        new2p5 = pms7003.getPM_2_5();
-        new10 = pms7003.getPM_10_0();
-                if (firstvalue == 0)  //do not do this on the first run
-        {
-            if (new1p0 > 200) {new1p0 = old1p0;} //check for data spikes in particle counter, ignore data that is >200
-            if (new2p5 > 200) {new2p5 = old2p5;} //data spikes ruin pretty graph
-            if (new10 > 200) {new10 = old10;}
-            if (new1p0 - old1p0 > 50) {new1p0 = old1p0;} //also ignore data that is >50 off from last data
-            if (new2p5 - old2p5 > 50) {new2p5 = old2p5;}
-            if (new10 - old10 > 50) {new10 = old10;}
-        }
-        pm1Avg.push(new1p0);
-        pm25Avg.push(new2p5);
-        pm10Avg.push(new10);
-        old1p0 = new1p0; //reset data spike check variable
-        old2p5 = new2p5;
-        old10 = new10;
 
-        new1p0a = pms7003.getPM_1_0_atmos(); 
-        new2p5a = pms7003.getPM_2_5_atmos();
-        new10a = pms7003.getPM_10_0_atmos();
-                if (firstvalue == 0)  //do not do this on the first run
-        {
-            if (new1p0a > 200) {new1p0a = old1p0a;} //check for data spikes in particle counter, ignore data that is >200
-            if (new2p5a > 200) {new2p5a = old2p5a;} //data spikes ruin pretty graph
-            if (new10a > 200) {new10a = old10a;}
-            if (new1p0a - old1p0a > 50) {new1p0a = old1p0a;} //also ignore data that is >50 off from last data
-            if (new2p5a - old2p5a > 50) {new2p5a = old2p5a;}
-            if (new10a - old10a > 50) {new10a = old10a;}
-        }
-        pm1aAvg.push(new1p0a);
-        pm25aAvg.push(new2p5a);
-        pm10aAvg.push(new10a);
-        old1p0a = new1p0a; //reset data spike check variable
-        old2p5a = new2p5a;
-        old10a = new10a;        
+        pm1Avg.push(pms7003.getPM_1_0());
+        pm25Avg.push(pms7003.getPM_2_5());
+        pm10Avg.push(pms7003.getPM_10_0());
+
        up3 = pms7003.getRawGreaterThan_0_3();
        up5 = pms7003.getRawGreaterThan_0_5();
        up10 = pms7003.getRawGreaterThan_1_0();
        up25 = pms7003.getRawGreaterThan_2_5();
        up50 = pms7003.getRawGreaterThan_5_0();
        up100 = pms7003.getRawGreaterThan_10_0();
-    firstvalue = 0;
+   // firstvalue = 0;
   }
 
 }
