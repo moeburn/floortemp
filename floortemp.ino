@@ -14,6 +14,12 @@
 #include <Arduino_JSON.h>
 #include "Plantower_PMS7003.h"
 #include <SoftwareSerial.h>
+#include "Adafruit_SHT4x.h"
+
+Adafruit_SHT4x sht4 = Adafruit_SHT4x();
+  sensors_event_t humidity, temp;
+
+  float tempSHT, humSHT, abshumSHT, dewpointSHT, humidexSHT;
 
 char output[256];
 Plantower_PMS7003 pms7003 = Plantower_PMS7003();
@@ -29,9 +35,9 @@ String countryCode = "CA";
 
 String jsonBuffer;
 
-Average<float> pm1Avg(6);
-Average<float> pm25Avg(6);
-Average<float> pm10Avg(6);
+Average<float> pm1Avg(12);
+Average<float> pm25Avg(12);
+Average<float> pm10Avg(12);
 Average<float> wifiAvg(30);
 Average<float> sunAvg(30);
 bool rapidfire = false;
@@ -39,10 +45,6 @@ float pmavgholder;
 float temperatureC;
 
 
-
-#define RGBPIN2 15
-#define RGBPIN1 0
-#define RGBPIN3 12
 
 const char* ntpServer = "pool.ntp.org";
 const long  gmtOffset_sec = -18000;   //Replace with your GMT offset (seconds)
@@ -132,10 +134,17 @@ WidgetBridge bridge1(V50);
 WidgetBridge bridge2(V60);
 
 void setup(void) {
-  
-     pinMode(RGBPIN1,HIGH);  // Blue led Pin Connected To D0 Pin   
-   pinMode(RGBPIN2,HIGH);  // Green Led Pin Connected To D1 Pin   
-   pinMode(RGBPIN3,HIGH);  // Red Led Connected To D2 Pin    
+  pinMode(0, INPUT_PULLUP);
+  pinMode(1, INPUT_PULLUP);
+  pinMode(2, INPUT_PULLUP);
+  pinMode(3, INPUT_PULLUP);
+  pinMode(5, INPUT_PULLUP);
+  pinMode(9, INPUT_PULLUP);
+  pinMode(10, INPUT_PULLUP);
+  pinMode(13, INPUT_PULLUP);
+  pinMode(15, INPUT_PULLUP);
+  pinMode(16, INPUT_PULLUP);
+
 
   Serial.begin(9600);
   SoftSerial1.begin(9600);
